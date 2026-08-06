@@ -2,10 +2,9 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Executive Sourcing Portal", layout="wide")
+st.set_page_config(page_title="Umaid Search Engine", layout="wide")
 
-st.title("🏢 Automated Executive Sourcing Portal")
-st.write("Find key decision-makers (CEO, Design, UX, Product, HR) across targeted organizations.")
+st.title("Umaid Search Engine")
 
 company_domain = st.text_input("Company Domain (e.g., ikea.com, spotify.com):", "")
 api_key = st.text_input("Hunter.io API Key:", type="password")
