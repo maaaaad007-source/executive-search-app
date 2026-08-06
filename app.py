@@ -2,81 +2,90 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# Page Configuration
-st.set_page_config(page_title="Executive Personnel Finder", layout="wide")
+st.set_page_config(page_title="Executive Sourcing Portal", layout="wide")
 
 st.title("🏢 Automated Executive Sourcing Portal")
-st.subheader("Enter a company name to find key decision-makers (CEO, Design, UX, Product, HR)")
+st.write("Find key decision-makers (CEO, Design, UX, Product, HR) across targeted organizations.")
 
-# User Inputs
-company_input = st.text_input("Company Name or Domain (e.g., Spotify, Volvo, spotify.com):", "")
-api_key = st.text_input("Apollo.io API Key:", type="password", help="Get a free API key at apollo.io")
-
-# Target Job Titles
-TARGET_TITLES = [
-    "Chief Executive Officer", "CEO", "Managing Director",
-    "Design Director", "Head of Design",
-    "UX Director", "Head of UX",
-    "Product Design Director", "Head of Product Design",
-    "Head of HR", "Chief People Officer", "VP Human Resources"
-]
-
-def search_executives(company_name, apollo_key):
-    url = "https://api.apollo.io/v1/mixed_people/search"
-    headers = {
-        "Cache-Control": "no-cache",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "api_key": apollo_key,
-        "q_organization_domains": [company_name] if "." in company_name else [],
-        "q_keywords": company_name if "." not in company_name else "",
-        "person_titles": TARGET_TITLES,
-        "page": 1,
-        "per_page": 25
-    }
-    
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        data = response.json()
-        people = data.get("people", [])
-        
-        results = []
-        for person in people:
-            results.append({
-                "Name": person.get("name", "N/A"),
-                "Title": person.get("title", "N/A"),
-                "Company": person.get("organization", {}).get("name", company_name),
-                "Email Status": person.get("email_status", "N/A"),
-                "LinkedIn": person.get("linkedin_url", "N/A"),
-                "Location": f"{person.get('city', '')}, {person.get('country', '')}".strip(", ")
-            })
-        return pd.DataFrame(results)
-        
-    else:
-        st.error(f"API Error {response.status_code}: {response.text}")
-        return pd.DataFrame()
+# Input fields
+company_domain = st.text_input("Company Name or Domain (e.g., spotify.com, volvo.com):", "")
+api_key = st.text_input("Apollo.io API Key:", type="password")
 
 if st.button("Search Personnel"):
-    if not company_input:
+    if not company_domain:
         st.warning("Please enter a company name or domain.")
     elif not api_key:
-        st.warning("Please enter your API Key to fetch live contacts.")
+        st.warning("Please enter your Apollo.io API Key.")
     else:
-        with st.spinner(f"Searching key personnel for '{company_input}'..."):
-            df_results = search_executives(company_input, api_key)
+        # Clean domain input
+        domain = company_domain.lower().replace("https://", "").replace("http://", "").replace("www.", "").strip()
+
+        st.info(f"Searching key personnel for: **{domain}**...")
+
+        # Apollo.io API endpoint
+        url = "https://api.apollo.io/api/v1/mixed_people/search"
+
+        # Headers requiring X-Api-Key
+        headers = {
+            "Cache-Control": "no-cache",
+            "Content-Type": "application/json",
+            "X-Api-Key": api_key.strip()
+        }
+
+        # Query payload targeted at key executive roles
+        payload = {
+            "q_organization_domains": [domain],
+            "page": 1,
+            "per_page": 25,
+            "person_titles": [
+                "Chief Executive Officer", "CEO", 
+                "Design Director", "Director of Design", 
+                "UX Director", "Director of UX", "Head of UX",
+                "Product Design Director", "Director of Product Design", 
+                "Head of HR", "HR Director", "VP of HR", "Chief People Officer"
+            ]
+        }
+
+        try:
+            response = requests.post(url, headers=headers, json=payload)
             
-            if not df_results.empty:
-                st.success(f"Found {len(df_results)} key executive profiles!")
-                st.dataframe(df_results, use_container_width=True)
-                
-                # CSV Export Option
-                csv = df_results.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Personnel Results as CSV",
-                    data=csv,
-                    file_name=f"{company_input}_executives.csv",
-                    mime="text/csv"
-                )
+            if response.status_code == 200:
+                data = response.json()
+                people = data.get("people", [])
+
+                if people:
+                    st.success(f"Found {len(people)} key executive profile(s)!")
+
+                    # Process results into a clean table
+                    results = []
+                    for person in people:
+                        name = person.get("name", "N/A")
+                        title = person.get("title", "N/A")
+                        org_name = person.get("organization", {}).get("name", domain)
+                        email = person.get("email", "Not available")
+                        linkedin_url = person.get("linkedin_url", "")
+
+                        results.append({
+                            "Name": name,
+                            "Title": title,
+                            "Company": org_name,
+                            "Email": email,
+                            "LinkedIn": linkedin_url
+                        })
+
+                    df = pd.DataFrame(results)
+                    st.dataframe(
+                        df, 
+                        column_config={
+                            "LinkedIn": st.column_config.LinkColumn("LinkedIn Profile")
+                        },
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No matching executive profiles found for target roles. Try using the exact domain name (e.g., spotify.com).")
+
             else:
-                st.info("No matching profiles found for the target titles. Try entering the exact domain name (e.g., spotify.com).")
+                st.error(f"API Error {response.status_code}: {response.text}")
+
+        except Exception as e:
+            st.error(f"An error occurred while making the request: {e}")
