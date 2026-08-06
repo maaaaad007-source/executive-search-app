@@ -30,7 +30,7 @@ if st.button("Search Personnel"):
                 emails = data.get("emails", [])
 
                 if emails:
-                    target_roles = ["ceo", "chief executive", "design", "ux", "product", "hr", "people", "talent"]
+                    target_roles = ["ceo", "chief executive", "founder", "director", "human resource", "user experience", "design", "ux", "product", "hr", "people", "talent"]
                     filtered_people = []
 
                     for person in emails:
